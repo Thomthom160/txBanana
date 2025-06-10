@@ -10,14 +10,9 @@ local function CleanupBanana()
 end
 
 local function StartBanana()
-    local ped = PlayerPedId()
 
     -- Banana Object Handling
-    local bananaHash = GetHashKey("ng_proc_food_nana1a")
-    RequestModel(bananaHash)
-    while (not HasModelLoaded(bananaHash)) do
-        Wait(1)
-    end
+    local bananaHash = lib.requestModel("ng_proc_food_nana1a")
 
     CleanupBanana()
     banana = CreateObject(bananaHash, x, y, z, true, false, true)
@@ -25,29 +20,27 @@ local function StartBanana()
 
     PlaceObjectOnGroundProperly(banana)
     SetEntityAsMissionEntity(banana)
-    AttachEntityToEntity(banana, ped, GetPedBoneIndex(ped, 18905), 0.2, 0.03, 0.03, 20.0, 190.0, -45.0, true, true, false, true, 1, true)
+    AttachEntityToEntity(banana, cache.ped, GetPedBoneIndex(cache.ped, 18905), 0.2, 0.03, 0.03, 20.0, 190.0, -45.0, true, true, false, true, 1, true)
 
     -- Animation Handling
-    RequestAnimDict("anim@mp_point")
-    while not HasAnimDictLoaded("anim@mp_point") do Wait(0) end
+    lib.requestAnimDict("anim@mp_point")
 
-    SetPedCurrentWeaponVisible(ped, 0, 1, 1, 1)
-    SetPedConfigFlag(ped, 36, 1)
-	TaskMoveNetworkByName(ped, 'task_mp_pointing', 0.5, false, 'anim@mp_point', 24)
+    SetPedCurrentWeaponVisible(cache.ped, 0, 1, 1, 1)
+    SetPedConfigFlag(cache.ped, 36, 1)
+	TaskMoveNetworkByName(cache.ped, 'task_mp_pointing', 0.5, false, 'anim@mp_point', 24)
     RemoveAnimDict("anim@mp_point")
 end
 
 local function StopBanana()
-    local ped = PlayerPedId()
     target = nil
 
     -- Animation Handling
-	RequestTaskMoveNetworkStateTransition(ped, 'Stop')
-    if not IsPedInjured(ped) then ClearPedSecondaryTask(ped) end
-    if not IsPedInAnyVehicle(ped, 1) then SetPedCurrentWeaponVisible(ped, 1, 1, 1, 1) end
+	RequestTaskMoveNetworkStateTransition(cache.ped, 'Stop')
+    if not IsPedInjured(cache.ped) then ClearPedSecondaryTask(cache.ped) end
+    if not IsPedInAnyVehicle(cache.ped, 1) then SetPedCurrentWeaponVisible(cache.ped, 1, 1, 1, 1) end
 
-    SetPedConfigFlag(ped, 36, 0)
-    ClearPedSecondaryTask(PlayerPedId())
+    SetPedConfigFlag(cache.ped, 36, 0)
+    ClearPedSecondaryTask(cache.ped)
 end
 
 -- This crashes the client if used on a Player Ped =(
@@ -73,25 +66,24 @@ end
 
 local function RayCastGamePlayCamera()
 	local cameraCoord = GetGameplayCamCoord()
-    local entityCoord = GetEntityCoords(PlayerPedId())
+    local entityCoord = cache.coords
 	local direction = RotationToDirection(GetGameplayCamRot())
     local distance = 50.0
 	local destination = vector3(cameraCoord.x + direction.x * distance, cameraCoord.y + direction.y * distance, cameraCoord.z + direction.z * distance)
 
-	local _, _, _, _, entityHit = GetShapeTestResult(StartShapeTestRay(entityCoord.x, entityCoord.y, entityCoord.z+0.6, destination.x, destination.y, destination.z, -1, PlayerPedId(), 0))
+	local _, _, _, _, entityHit = GetShapeTestResult(StartShapeTestRay(entityCoord.x, entityCoord.y, entityCoord.z+0.6, destination.x, destination.y, destination.z, -1, cache.ped, 0))
     -- DrawLine(entityCoord.x, entityCoord.y, entityCoord.z+0.6, destination.x, destination.y, destination.z, 255, 255, 0, 0.5)
     return entityHit
 end
 
 RegisterCommand('txBanana', function()
     CleanupBanana()
-    if not IsPedInAnyVehicle(PlayerPedId(), false) then
+    if cahe.vehicle then
         bananaing = not bananaing
         if bananaing then StartBanana() end
 
         CreateThread(function()
             while bananaing do
-                local ped = PlayerPedId()
 
                 local camPitch = GetGameplayCamRelativePitch()
                 if camPitch < -70.0 then
@@ -113,10 +105,10 @@ RegisterCommand('txBanana', function()
                 local entityHit = RayCastGamePlayCamera()
 
                 -- Point Location Logic
-                SetTaskMoveNetworkSignalFloat(ped, "Pitch", camPitch)
-                SetTaskMoveNetworkSignalFloat(ped, "Heading", camHeading * -1.0 + 1.0)
-                SetTaskMoveNetworkSignalBool(ped, "isBlocked", false)
-                SetTaskMoveNetworkSignalBool(ped, "isFirstPerson", GetCamViewModeForContext(GetCamActiveViewModeContext()) == 4)
+                SetTaskMoveNetworkSignalFloat(cache.ped, "Pitch", camPitch)
+                SetTaskMoveNetworkSignalFloat(cache.ped, "Heading", camHeading * -1.0 + 1.0)
+                SetTaskMoveNetworkSignalBool(cache.ped, "isBlocked", false)
+                SetTaskMoveNetworkSignalBool(cache.ped, "isFirstPerson", GetCamViewModeForContext(GetCamActiveViewModeContext()) == 4)
 
                 DisableControlAction(0, 24, true)
                 DisableControlAction(0, 25, true)
@@ -134,13 +126,23 @@ RegisterCommand('txBanana', function()
                     if target then
                         -- Handle Left Click
                         if IsDisabledControlJustPressed(0, 24) and target then
-                            ExecuteCommand('tx '..GetPlayerServerId(NetworkGetPlayerIndexFromPed(target)))
-                            print('Shot Player ID', GetPlayerServerId(NetworkGetPlayerIndexFromPed(target)))
+                            if IsPedAPlayer(entityHit) then
+                                ExecuteCommand('tx '..GetPlayerServerId(NetworkGetPlayerIndexFromPed(target)))
+                                print('Shot Player ID', GetPlayerServerId(NetworkGetPlayerIndexFromPed(target)))
+                            else
+                            
+                            end
                         end
 
                         -- Handle Right Click
                         if IsDisabledControlJustPressed(0, 25) then
-                            print('Right Clicked ID', GetPlayerServerId(NetworkGetPlayerIndexFromPed(target)))
+                            if IsPedAPlayer(entityHit) then
+                                local targetId = GetPlayerServerId(NetworkGetPlayerIndexFromPed(target))
+                                print('Right Clicked ID', targetId)
+                                TriggerServerEvent('TxBanana:server:launchPlayer', { targetId = targetId })
+                            else
+
+                            end
                         end
                     end
                 elseif target then
@@ -163,4 +165,4 @@ AddEventHandler('onResourceStop', function(res)
 end)
 
 -- Handle Keymapping
-RegisterKeyMapping('txBanana', 'Toggles Banana', 'keyboard', 'B')
+--RegisterKeyMapping('txBanana', 'Toggles Banana', 'keyboard', 'B')
