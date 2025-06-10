@@ -25,7 +25,7 @@ local function StartBanana()
     -- Animation Handling
     lib.requestAnimDict("anim@mp_point")
 
-    SetPedCurrentWeaponVisible(cache.ped, 0, 1, 1, 1)
+    SetPedCurrentWeaponVisible(cache.ped, false, true, true, true)
     SetPedConfigFlag(cache.ped, 36, 1)
 	TaskMoveNetworkByName(cache.ped, 'task_mp_pointing', 0.5, false, 'anim@mp_point', 24)
     RemoveAnimDict("anim@mp_point")
@@ -37,7 +37,7 @@ local function StopBanana()
     -- Animation Handling
 	RequestTaskMoveNetworkStateTransition(cache.ped, 'Stop')
     if not IsPedInjured(cache.ped) then ClearPedSecondaryTask(cache.ped) end
-    if not IsPedInAnyVehicle(cache.ped, 1) then SetPedCurrentWeaponVisible(cache.ped, 1, 1, 1, 1) end
+    if not IsPedInAnyVehicle(cache.ped, true) then SetPedCurrentWeaponVisible(cache.ped, true, true, true, true) end
 
     SetPedConfigFlag(cache.ped, 36, 0)
     ClearPedSecondaryTask(cache.ped)
@@ -76,9 +76,9 @@ local function RayCastGamePlayCamera()
     return entityHit
 end
 
-RegisterCommand('txBanana', function()
+local function toggleBanana()
     CleanupBanana()
-    if cahe.vehicle then
+    if not cache.vehicle then
         bananaing = not bananaing
         if bananaing then StartBanana() end
 
@@ -114,7 +114,8 @@ RegisterCommand('txBanana', function()
                 DisableControlAction(0, 25, true)
 
                 -- Detect Entity Hit
-                if entityHit ~= 0 and IsEntityAPed(entityHit) then
+                local entityType = GetEntityType(entityHit)
+                if entityHit ~= 0 and (entityType == 1 or entityType == 2) then
 
                     if entityHit ~= target then
                         if target then OutlineTarget(false) end
@@ -130,7 +131,7 @@ RegisterCommand('txBanana', function()
                                 ExecuteCommand('tx '..GetPlayerServerId(NetworkGetPlayerIndexFromPed(target)))
                                 print('Shot Player ID', GetPlayerServerId(NetworkGetPlayerIndexFromPed(target)))
                             else
-                            
+                                TriggerServerEvent('TxBanana:server:executeAction', { type = 'delete' , targetId = NetworkGetNetworkIdFromEntity(entityHit), })
                             end
                         end
 
@@ -139,9 +140,9 @@ RegisterCommand('txBanana', function()
                             if IsPedAPlayer(entityHit) then
                                 local targetId = GetPlayerServerId(NetworkGetPlayerIndexFromPed(target))
                                 print('Right Clicked ID', targetId)
-                                TriggerServerEvent('TxBanana:server:launchPlayer', { targetId = targetId })
+                                TriggerServerEvent('TxBanana:server:executeAction', { type = 'launch', targetId = targetId, isPlayer = true })
                             else
-
+                                TriggerServerEvent('TxBanana:server:executeAction', { type = 'launch', targetId = NetworkGetNetworkIdFromEntity(entityHit)})
                             end
                         end
                     end
@@ -157,6 +158,10 @@ RegisterCommand('txBanana', function()
             StopBanana()
         end)
     end
+end
+
+RegisterNetEvent('TxBanana:client:toggle', function()
+    toggleBanana()
 end)
 
 -- Handle Cleanup on Resource Stop
@@ -166,3 +171,4 @@ end)
 
 -- Handle Keymapping
 --RegisterKeyMapping('txBanana', 'Toggles Banana', 'keyboard', 'B')
+lib.onCache('ped', function(new, old) end)
