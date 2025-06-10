@@ -172,3 +172,5 @@ end)
 -- Handle Keymapping
 --RegisterKeyMapping('txBanana', 'Toggles Banana', 'keyboard', 'B')
 lib.onCache('ped', function(new, old) end)
+local temp = lib.points.new({coords = vector3(0.0, 0.0, 0.0), distance = 2.0})
+temp:remove()
